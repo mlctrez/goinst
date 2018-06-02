@@ -1,1 +1,1 @@
-module goinst
+module github.com/mlctrez/goinst
