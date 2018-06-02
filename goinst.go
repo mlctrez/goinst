@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,8 +12,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
+// Version is the semver representation of the go version
 type Version struct {
 	Major int
 	Minor int
@@ -123,32 +124,42 @@ func getOsArch() (os, arch string, err error) {
 }
 
 func getVersions() []*Version {
-	command := exec.Command("git", "ls-remote", "-t", "https://go.googlesource.com/go")
-	lsout, err := command.CombinedOutput()
+
+	res, err := http.Get("https://golang.org/dl/")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+	}
+
+	defer res.Body.Close()
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		log.Fatal(err)
 	}
 	versions := make([]*Version, 0)
-	scanner := bufio.NewScanner(bytes.NewBuffer(lsout))
-	for scanner.Scan() {
-		split := strings.Split(scanner.Text(), "\t")
-		tagName := split[1]
-		if !strings.HasPrefix(tagName, "refs/tags/go") || strings.Contains(tagName, "beta") || strings.Contains(tagName, "rc") {
-			continue
-		}
-		tagName = strings.Replace(tagName, "refs/tags/go", "", 1)
 
-		v, e := ParseVersion(tagName)
-		if e != nil {
-			continue
+	doc.Find(".download").Each(func(i int, s *goquery.Selection) {
+		if h, ok := s.Attr("href"); ok {
+			// https://dl.google.com/go/go1.3.src.tar.gz -> 1.3
+			if strings.HasSuffix(h, ".src.tar.gz") {
+				gv := strings.TrimPrefix(h, "https://dl.google.com/go/go")
+				gv = strings.TrimSuffix(gv, ".src.tar.gz")
+				v, e := ParseVersion(gv)
+				if e == nil {
+					versions = append(versions, v)
+				}
+			}
 		}
-		versions = append(versions, v)
+	})
 
-	}
 	sort.Sort(ByVersion(versions))
 	return versions
 }
 
+// VersionTag produces a go version tag, dropping trailing zero parts
 func (v *Version) VersionTag() string {
 	u := fmt.Sprintf("go%d", v.Major)
 
@@ -161,6 +172,7 @@ func (v *Version) VersionTag() string {
 	return u
 }
 
+// DownLoadLink calculates the download link based on os and arch
 func (v *Version) DownLoadLink(os, arch string) string {
 	u := "https://dl.google.com/go/"
 
@@ -195,6 +207,7 @@ func (v *Version) DownLoadLink(os, arch string) string {
 
 */
 
+// LessThan for comparing versions
 func (v *Version) LessThan(o *Version) bool {
 	if v.Major != o.Major {
 		return v.Major < o.Major
@@ -205,12 +218,19 @@ func (v *Version) LessThan(o *Version) bool {
 	return v.Patch < o.Patch
 }
 
+// ByVersion allows for sorting
 type ByVersion []*Version
 
-func (a ByVersion) Len() int           { return len(a) }
-func (a ByVersion) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+// Len for sort
+func (a ByVersion) Len() int { return len(a) }
+
+// Swap for sort
+func (a ByVersion) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+
+// Less for sort
 func (a ByVersion) Less(i, j int) bool { return a[i].LessThan(a[j]) }
 
+// ParseVersion string -> int,int,int semver
 func ParseVersion(ver string) (v *Version, err error) {
 	p := strings.Split(ver, ".")
 
