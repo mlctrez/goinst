@@ -16,11 +16,12 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// Version is the semver representation of the go version
+// Version is the semver plus release candidate representation of the go version
 type Version struct {
-	Major int
-	Minor int
-	Patch int
+	Major            int
+	Minor            int
+	Patch            int
+	ReleaseCandidate bool
 }
 
 func exitOnError(err error) {
@@ -167,7 +168,11 @@ func (v *Version) VersionTag() string {
 		u += fmt.Sprintf(".%d", v.Minor)
 	}
 	if v.Patch > 0 {
-		u += fmt.Sprintf(".%d", v.Patch)
+		patchFormat := ".%d"
+		if v.ReleaseCandidate {
+			patchFormat = "rc%d"
+		}
+		u += fmt.Sprintf(patchFormat, v.Patch)
 	}
 	return u
 }
@@ -215,7 +220,13 @@ func (v *Version) LessThan(o *Version) bool {
 	if v.Minor != o.Minor {
 		return v.Minor < o.Minor
 	}
-	return v.Patch < o.Patch
+	if v.Patch != o.Patch {
+		return v.Patch < o.Patch
+	}
+	if v.ReleaseCandidate {
+		return !o.ReleaseCandidate
+	}
+	return false
 }
 
 // ByVersion allows for sorting
@@ -232,9 +243,16 @@ func (a ByVersion) Less(i, j int) bool { return a[i].LessThan(a[j]) }
 
 // ParseVersion string -> int,int,int semver
 func ParseVersion(ver string) (v *Version, err error) {
-	p := strings.Split(ver, ".")
 
 	v = &Version{}
+
+	if strings.Contains(ver, "rc") {
+		v.ReleaseCandidate = true
+		ver = strings.Replace(ver, "rc", ".", 1)
+	}
+
+	p := strings.Split(ver, ".")
+
 	if len(p) > 0 {
 		i, e := strconv.Atoi(p[0])
 		if e != nil {
