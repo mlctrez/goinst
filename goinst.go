@@ -220,17 +220,21 @@ func (v *Version) LessThan(o *Version) bool {
 	if v.Minor != o.Minor {
 		return v.Minor < o.Minor
 	}
-	if v.Patch != o.Patch {
-		if v.ReleaseCandidate && o.ReleaseCandidate {
-			return v.Patch < o.Patch
-		}
+
+	if v.ReleaseCandidate && o.ReleaseCandidate {
+		return v.Patch < o.Patch
+	}
+	if !v.ReleaseCandidate && !o.ReleaseCandidate {
+		return v.Patch < o.Patch
+	}
+	if v.ReleaseCandidate && !o.ReleaseCandidate {
+		return true
+	}
+	if !v.ReleaseCandidate && o.ReleaseCandidate {
+		return false
 	}
 
-	if v.ReleaseCandidate {
-		return !o.ReleaseCandidate
-	}
-
-	return false
+	return v.Patch < o.Patch
 }
 
 // ByVersion allows for sorting
