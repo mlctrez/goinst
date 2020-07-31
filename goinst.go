@@ -146,7 +146,7 @@ func getVersions() []*Version {
 		if h, ok := s.Attr("href"); ok {
 			// https://dl.google.com/go/go1.3.src.tar.gz -> 1.3
 			if strings.HasSuffix(h, ".src.tar.gz") {
-				gv := strings.TrimPrefix(h, "https://dl.google.com/go/go")
+				gv := strings.TrimPrefix(h, "/dl/go")
 				gv = strings.TrimSuffix(gv, ".src.tar.gz")
 				v, e := ParseVersion(gv)
 				if e == nil {
