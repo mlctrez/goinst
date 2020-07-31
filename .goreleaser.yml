@@ -1,7 +1,10 @@
 builds:
-
-- env:
-  - CGO_ENABLED=0
+  -
+    ignore:
+      - goos: darwin
+        goarch: 386
+    env:
+      - CGO_ENABLED=0
 
 archives:
   -
